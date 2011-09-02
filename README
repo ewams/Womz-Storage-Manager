@@ -1,0 +1,36 @@
+##############################LICENSE################################
+#Copyright (c) 2011 Eric Wamsley.                                   #
+#All rights reserved.                                               #
+#                                                                   #
+#Redistribution and use in source and binary forms are permitted    #
+#provided that the above copyright notice and this paragraph are    #
+#duplicated and viewable in all forms and that any documentation,   #
+#advertising materials, and other materials related to such         #
+#distribution and use acknowledge that the software was developed   #
+#by ERIC WAMSLEY.                                                   #
+#                                                                   #
+#THIS SOFTWARE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR       #
+#IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED     #
+#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.#
+##############################LICENSE################################
+
+Womz Storage Manager – WSM
+Author: Eric Wamsley
+Site: http://ewams.net
+
+Summary
+WSM aims to provide a simple utility for managing storage devices on a Linux system.
+
+Details
+WSM is a Perl program that uses common built-in features of an OS to manage storage devices in a Linux system.
+
+Features
+Scan for new storage devices
+View storage devices and device details
+Automatically install S.M.A.R.T tools (smartmontools) and RAID tools (mdadm) if desired
+
+TODO
+Manage RAID devices
+Manage partitions
+Manage file systems
+etc.
