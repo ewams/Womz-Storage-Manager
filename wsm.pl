@@ -269,15 +269,6 @@ sub viewStorageDeviceDetails {
 		`fdisk -luc $device 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$0 }' > /tmp/fdisk`;
 		`blkid 2>&1 > /tmp/blkid`;
         #get details about device
-		chomp(my $model = `cat /tmp/smart | awk '\$0 ~ /Model/ { print \$0 }'`);
-		chomp(my $serial = `cat /tmp/smart | awk '\$0 ~ /Serial/ { print \$0 }'`);
-		chomp(my $turnedon = `cat /tmp/smart | awk '\$0 ~ /Start_Stop_Count/ { print \$10 }'`);
-		chomp(my $poweredon = `cat /tmp/smart | awk '\$0 ~ /Power_On_Hours/ { print \$10 }'`);
-		chomp(my $temp = `cat /tmp/smart | awk '\$0 ~ /Temperature_Celsius/ { print \$10 }'`);
-		chomp(my $rawreaderror = `cat /tmp/smart | awk '\$0 ~ /Raw_Read_Error_Rate/ { print \$10 }'`);
-		chomp(my $reallocsector = `cat /tmp/smart | awk '\$0 ~ /Reallocated_Sector_Ct/ { print \$10 }'`);
-		chomp(my $seekerror = `cat /tmp/smart | awk '\$0 ~ /Seek_Error_Rate/ { print \$10 }'`);
-		chomp(my $offuncor = `cat /tmp/smart | awk '\$0 ~ /Offline_Uncorrectable/ { print \$10 }'`);
 		chomp(my $size = `fdisk -l $device 2>&1 | awk '\$0 ~ /bytes/ && \$0 ~ /Disk/ {print \$5}'`);
 		chomp(my $sectorsize = `fdisk -luc /dev/sdd | awk '\$0 ~ /Sector size/ { print \$4 }'`);
 		$size = &convertSize($size);	
@@ -285,19 +276,36 @@ sub viewStorageDeviceDetails {
 
         #print information
 		print "\n\nStorage device: $device\n";
-		print "Model: $model\n";
-		print "Serial Number: $serial\n";
 		print "Sector Size: $sectorsize bytes\n";
 		print "Device Capacity: $size\n";
-		print "\n\n";
-		print "Device Status:\n";
-		print "Current Temperature: $temp Celcius\n";
-		print "Total hours powered on: $poweredon\n";
-		print "Number of times powered on: $turnedon\n";
-		print "Total read errors from disk surface (Raw_Read_Error_Rate): $rawreaderror\n";
-		print "Total seek errors of heads (Seek_Error_Rate): $seekerror\n";
-		print "Total I/O uncorrectable errors from disk surface (Offline_Uncorrectable): $offuncor\n";
-		print "Total number of reallocated sectors from I/O error (Reallocated_Sector_Count): $reallocsector\n";
+        
+        #test if smartctl exists, if does get more stats from it
+        if(&testSmartctl() eq "true"){
+            chomp(my $model = `cat /tmp/smart | awk '\$0 ~ /Model/ { print \$0 }'`);
+    		chomp(my $serial = `cat /tmp/smart | awk '\$0 ~ /Serial/ { print \$0 }'`);
+    		chomp(my $turnedon = `cat /tmp/smart | awk '\$0 ~ /Start_Stop_Count/ { print \$10 }'`);
+    		chomp(my $poweredon = `cat /tmp/smart | awk '\$0 ~ /Power_On_Hours/ { print \$10 }'`);
+            chomp(my $temp = `cat /tmp/smart | awk '\$0 ~ /Temperature_Celsius/ { print \$10 }'`);
+    		chomp(my $rawreaderror = `cat /tmp/smart | awk '\$0 ~ /Raw_Read_Error_Rate/ { print \$10 }'`);
+    		chomp(my $reallocsector = `cat /tmp/smart | awk '\$0 ~ /Reallocated_Sector_Ct/ { print \$10 }'`);
+    		chomp(my $seekerror = `cat /tmp/smart | awk '\$0 ~ /Seek_Error_Rate/ { print \$10 }'`);
+    		chomp(my $offuncor = `cat /tmp/smart | awk '\$0 ~ /Offline_Uncorrectable/ { print \$10 }'`);
+            print "Model: $model\n";
+            print "Serial Number: $serial\n";
+    		print "\n\n";
+    		print "Device Status:\n";
+    		print "Current Temperature: $temp Celcius\n";
+    		print "Total hours powered on: $poweredon\n";
+    		print "Number of times powered on: $turnedon\n";
+    		print "Total read errors from disk surface (Raw_Read_Error_Rate): $rawreaderror\n";
+    		print "Total seek errors of heads (Seek_Error_Rate): $seekerror\n";
+    		print "Total I/O uncorrectable errors from disk surface (Offline_Uncorrectable): $offuncor\n";
+    		print "Total number of reallocated sectors from I/O error (Reallocated_Sector_Count): $reallocsector\n";
+        }#end if
+        else{
+            print "\n\nS.M.A.R.T. tools not found. It is recommended that you run the tools installer from the main menu.";
+        }#end else
+
 		print "\n\n";
 		print "Partition information:\n";
 		
@@ -325,6 +333,7 @@ sub viewStorageDeviceDetails {
 #0 - String - Device name that partition is on
 #1 - String - Partition name to get info about
 #Returns: n/a
+#TODO - test partition for no filesystem, no mounts, and no space used/free#
 sub viewPartitionInfo {
     my($device) = $_[0];
 	my($partition) = $_[1];
@@ -344,7 +353,7 @@ sub viewPartitionInfo {
 	if($isbootable =~ m/yes/){
 		chomp($sectorsend = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$4 }'`);
 		chomp($sectorstart = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$3 }'`);
-        $isbootable = "is bootable";
+        $isbootable = " is bootable";
 	}#end if
 	else{
 		chomp($sectorsend = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$3 }'`);
@@ -373,7 +382,7 @@ sub viewPartitionInfo {
 	}#end elsif
 	else{
 		chomp(my $free = `df -h $mountloc 2>&1 | awk '\$0 ~ /$workingpart/ { print 100-\$5 }'`);
-		print "Partition found: $partition $isbootable and has a filesystem type of $fstype mounted on $mountloc \tSize is $totalsize with $free \% free\n";
+		print "Partition found: $partition$isbootable and has a filesystem type of $fstype mounted on $mountloc \tSize is $totalsize with $free \% free\n";
 	}#end else
 
 }#end function viewPartitionInfo
