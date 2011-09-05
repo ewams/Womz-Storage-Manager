@@ -16,9 +16,9 @@
 ##############################LICENSE################################
 
 
-###########
-#Variables#
-###########
+        ###########
+        #Variables#
+        ###########
 $g_vers = "2011.9.05 Experimental";
 $g_app = "Womz Storage Manager";
 $g_auth = "Eric Wamsley";
@@ -36,9 +36,9 @@ system("clear");
 
 
 
-###########
-#Functions#
-###########
+        ################
+        #Menu Functions#
+        ################
 
 
 #Function mainMenu
@@ -64,7 +64,7 @@ sub mainMenu {
 		&mainMenu();
 	}#end elsif
 	elsif($option == 3){
-		&mainMenu();
+		&menuPartitionsTop();
 	}#end elsif
 	elsif($option == 4){
 		&mainMenu();
@@ -81,6 +81,219 @@ sub mainMenu {
 		&mainMenu();
 	}#end else
 }#end function mainMenu
+
+
+
+#Function menuStorageDevicesTop
+#Top menu for the Storage Devices Menu (option 1 from Main Menu).
+#Calls functions based on user input.
+#Params: n/a
+#Returns: n/a
+sub menuStorageDevicesTop {
+	print "\n\nPhysical Storage Devices\nWhat would you like to do?\n";
+	print "1 - Scan for new storage devices\n";
+	print "2 - View all storage devices\n";
+	print "3 - View storage device details\n";
+	print "4 - Test storage device\n";
+	print "5 - Main Menu\n";
+	print "6 - Exit\n";
+	print "Enter a choice (or exit): ";
+	chomp(my $option = <>);
+    
+    #determine user's choice and execute related functions
+	if($option == 1){
+        &scanNewDevices();
+        &menuStorageDevicesTop();
+	}#end if
+    elsif($option == 2){
+    	&printAllDiskInfo();
+    	&menuStorageDevicesTop();
+    }#end elsif
+    elsif($option == 3){
+    	&viewStorageDeviceDetails();
+    	&menuStorageDevicesTop();
+    }#end elsif
+    elsif($option == 4){
+    	&testStorageDevice();
+    	&menuStorageDevicesTop();
+    }#end elsif
+    elsif($option == 5){
+    	&mainMenu();
+    }#end elsif
+    elsif(($option == 6) || ($option eq "exit")){
+    	&quit();
+    }#end elsif
+    else{
+        print "\n\nPlease select an option from below.\n"
+        &menuStorageDevicesTop();
+    }#end else
+}#end function menuStorageDevicesTop
+
+
+#Function menuPartitionsTop
+#Top menu or the partitions menu (option 3 from Main Menu).
+#Calls functions based on user input.
+#Params: n/a
+#Returns: n/a
+sub menuPartitionsTop {
+    print "\n\nPartitions\nWhat would you like to do?\n";
+    print "1 - View all partitions\n";
+    print "2 - Create a partition\n";
+    print "3 - Delete a partition\n";
+    print "4 - Main Menu\n";
+    print "5 - Exit\n";
+    print "Enter a choice (or exit): ";
+    chomp(my $option = <>);
+    
+    #determine user choice and run related function
+    if($option == 1){
+        &viewAllPartitions();
+        &menuPartitionsTop();
+    }#end if
+    elsif($option == 2){
+        &menuPartitionsTop();
+    }#end elsif
+    elsif($option == 3){
+        &menuPartitionsTop();
+    }#end elsif
+    elsif($option == 4){
+        &mainMenu();
+    }#end elsif
+    elsif(($option == 5) || ($option eq "exit")){
+    	&quit();
+    }#end elsif
+    else{
+        print "\n\nPlease select an option from below.\n"
+        &menuPartitionsTop();
+    }#end else
+}#end function menuPartitionsTop
+
+
+
+
+
+
+
+            ####################
+            ##COMMON FUNCTIONS##
+            ####################
+
+
+#Function printGreeting
+#Prints the first greeting message to screen
+#Params: n/a
+#Returns: n/a
+sub printGreeting{
+	print "Running $g_app version $g_vers by $g_auth.\n";
+	print "Visit $g_site for more information.\n";
+	print "\n$g_firstmsg\n";
+}#end function printGreeting
+
+
+#Function testIsRoot
+#Tests to see if the script is ran as root. If not it quickly exits.
+#Params: n/a
+#Returns: n/a
+sub testIsRoot {
+	if( $< != 0 ){
+		&quit("This application must be ran as root.");
+	}#end if
+}#end function testIsRoot
+
+
+#Function getDisks
+#Gets a listing of all storage devices and puts in /tmp/disks
+#Params: n/a
+#Returns: n/a
+sub getDisks {
+	my $command = "awk \'\$3 ~ /[hs]d/ && \$3 !~ /[0-9]/ {print \"/dev/\" \$3}\' /proc/diskstats | sort > /tmp/disks";
+	system($command);
+}#end function getDisks
+
+
+#Function quit
+#Exits the program.
+#Params:
+#0 - String - Reason for exit
+#Returns: n/a
+sub quit {
+    `rm -rf /tmp/blkid /tmp/disks /tmp/fdisk /tmp/hostscan /tmp/smart`;
+	my($reason) = @_;
+	die $reason."\nHave a nice day.\n";
+}#end quit function
+
+
+#Function convertSize
+#Tests the provided number if it is KB, MB, GB, or TB and returns with ###.## _B
+#Params:
+#0 - Integer - Total size in Bytes
+#Returns:
+#0 - String - New value with unit (eq: 349 MegaBytes)
+sub convertSize{
+	my($size) = @_;
+	chomp($size);
+	if($size < 1024){
+		return "$size Bytes";
+	}#end if
+	elsif(($size >= 1024) && ($size < 1048576)){
+		$size = ($size/1024);
+		$size = sprintf("%.2f", $size);
+		return "$size KiloBytes";
+	}#end elsif
+	elsif(($size >= 1048576) && ($size < 1073741824)){
+		$size = ($size/1048576);
+		$size = sprintf("%.2f", $size);
+		return "$size MegaBytes";
+	}#end elsif
+	elsif(($size >= 1073741824) && ($size < 1099511627776)){
+		$size = ($size/1073741824);
+		$size = sprintf("%.2f", $size);
+		return "$size GigaBytes";
+	}#end elsif
+	else{
+		$size = ($size/1099511627776);
+		$size = sprintf("%.2f", $size);
+		return "$size TeraBytes";
+	}#end else
+}#end function convertSize
+
+
+#Function selectDevice
+#Prints a menu of all physical devices and allows the user to select one.
+#Params: n/a
+#Returns:
+#0 - String - Full path to device (eg: /dev/sda) or "fail" if user enters invalid option
+sub selectDevice {
+    #create list of disks in tmp file
+	&getDisks();
+    my $disksfile = "/tmp/disks";
+    my $counter = 1;
+	my $diskchoice = 0;
+    open(DISKSFH, $disksfile);
+    my @disks = <DISKSFH>;
+    close(DISKSFH);
+    
+    #print menu with each device
+    foreach $line (@disks){
+        my $diskname = $line;
+        chomp($diskname);
+        print "$counter - $diskname\n";
+        $counter++;
+    }#end foreach
+	$counter--;
+    
+    #get user input
+    print "\nEnter a device number: ";
+    chomp($diskchoice = <>);
+	if (($diskchoice == $counter) || (($diskchoice <= $counter) && ($diskchoice > 0))){
+		$diskchoice = $diskchoice-1;
+		return $disks[$diskchoice];
+	}#end if
+	else{
+		return "fail";
+	}#end else
+}#end function selectDevice
+
 
 
 #Function installTools
@@ -146,52 +359,6 @@ sub testMdadm {
             return "false";
         }#end else
 }#end function testMdadm
-
-
-#Function menuStorageDevicesTop
-#Top menu for the Storage Devices Menu (option 1 from Main Menu).
-#Calls functions based on user input.
-#Params: n/a
-#Returns: n/a
-sub menuStorageDevicesTop {
-	print "\n\nPhysical Storage Devices\nWhat would you like to do?\n";
-	print "1 - Scan for new storage devices\n";
-	print "2 - View all storage devices\n";
-	print "3 - View storage device details\n";
-	print "4 - Test storage device\n";
-	print "5 - Main Menu\n";
-	print "6 - Exit\n";
-	print "Enter a choice (or exit): ";
-	chomp($g_option = <>);
-    
-    #determine user's choice and execute related functions
-	if($g_option == 1){
-        &scanNewDevices();
-        &menuStorageDevicesTop();
-	}#end if
-    elsif($g_option == 2){
-    	&printAllDiskInfo();
-    	&menuStorageDevicesTop();
-    }#end elsif
-    elsif($g_option == 3){
-    	&viewStorageDeviceDetails();
-    	&menuStorageDevicesTop();
-    }#end elsif
-    elsif($g_option == 4){
-    	&testStorageDevice();
-    	&menuStorageDevicesTop();
-    }#end elsif
-    elsif($g_option == 5){
-    	&mainMenu();
-    }#end elsif
-    elsif(($g_option == 6) || ($g_option eq "exit")){
-    	&quit();
-    }#end elsif
-    else{
-        print "\n\nPlease select an option from below.\n"
-        &menuStorageDevicesTop();
-    }#end else
-}#end function menuStorageDevicesTop
 
 
 #Function scanNewDevices
@@ -405,7 +572,6 @@ sub viewPartitionInfo {
 }#end function viewPartitionInfo
 
 
-
 #Function testStorageDevice
 #Uses smartmontools to test storage device functionality.
 #Params:
@@ -417,133 +583,13 @@ sub testStorageDevice {
 }#end function testStorageDevice
 
 
-
-
-
-
-
-
-
-            ####################
-            ##COMMON FUNCTIONS##
-            ####################
-#All common functions are called from other functions#
-
-
-#Function printGreeting
-#Prints the first greeting message to screen
+#Function viewAllPartitions
+#Prints all partitions on every device.
 #Params: n/a
 #Returns: n/a
-sub printGreeting{
-	print "Running $g_app version $g_vers by $g_auth.\n";
-	print "Visit $g_site for more information.\n";
-	print "\n$g_firstmsg\n";
-}#end function printGreeting
-
-
-#Function testIsRoot
-#Tests to see if the script is ran as root. If not it quickly exits.
-#Params: n/a
-#Returns: n/a
-sub testIsRoot {
-	if( $< != 0 ){
-		&quit("This application must be ran as root.");
-	}#end if
-}#end function testIsRoot
-
-
-#Function getDisks
-#Gets a listing of all storage devices and puts in /tmp/disks
-#Params: n/a
-#Returns: n/a
-sub getDisks {
-	my $command = "awk \'\$3 ~ /[hs]d/ && \$3 !~ /[0-9]/ {print \"/dev/\" \$3}\' /proc/diskstats | sort > /tmp/disks";
-	system($command);
-}#end function getDisks
-
-
-#Function quit
-#Exits the program.
-#Params:
-#0 - String - Reason for exit
-#Returns: n/a
-#TODO - remove all temporary files#
-sub quit {
-	my($reason) = @_;
-	die $reason."\nHave a nice day.\n";
-}#end quit function
-
-
-#Function convertSize
-#Tests the provided number if it is KB, MB, GB, or TB and returns with ###.## _B
-#Params:
-#0 - Integer - Total size in Bytes
-#Returns:
-#0 - String - New value with unit (eq: 349 MegaBytes)
-sub convertSize{
-	my($size) = @_;
-	chomp($size);
-	if($size < 1024){
-		return "$size Bytes";
-	}#end if
-	elsif(($size >= 1024) && ($size < 1048576)){
-		$size = ($size/1024);
-		$size = sprintf("%.2f", $size);
-		return "$size KiloBytes";
-	}#end elsif
-	elsif(($size >= 1048576) && ($size < 1073741824)){
-		$size = ($size/1048576);
-		$size = sprintf("%.2f", $size);
-		return "$size MegaBytes";
-	}#end elsif
-	elsif(($size >= 1073741824) && ($size < 1099511627776)){
-		$size = ($size/1073741824);
-		$size = sprintf("%.2f", $size);
-		return "$size GigaBytes";
-	}#end elsif
-	else{
-		$size = ($size/1099511627776);
-		$size = sprintf("%.2f", $size);
-		return "$size TeraBytes";
-	}#end else
-}#end function convertSize
-
-
-#Function selectDevice
-#Prints a menu of all physical devices and allows the user to select one.
-#Params: n/a
-#Returns:
-#0 - String - Full path to device (eg: /dev/sda) or "fail" if user enters invalid option
-sub selectDevice {
-    #create list of disks in tmp file
-	&getDisks();
-    my $disksfile = "/tmp/disks";
-    my $counter = 1;
-	my $diskchoice = 0;
-    open(DISKSFH, $disksfile);
-    my @disks = <DISKSFH>;
-    close(DISKSFH);
+sub viewAllPartitions {
     
-    #print menu with each device
-    foreach $line (@disks){
-        my $diskname = $line;
-        chomp($diskname);
-        print "$counter - $diskname\n";
-        $counter++;
-    }#end foreach
-	$counter--;
-    
-    #get user input
-    print "\nEnter a device number: ";
-    chomp($diskchoice = <>);
-	if (($diskchoice == $counter) || (($diskchoice <= $counter) && ($diskchoice > 0))){
-		$diskchoice = $diskchoice-1;
-		return $disks[$diskchoice];
-	}#end if
-	else{
-		return "fail";
-	}#end else
-}#end function selectDevice
+}#end function viewAllPartitions
 
 #####
 #EOF#
