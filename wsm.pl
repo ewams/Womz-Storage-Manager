@@ -20,7 +20,7 @@
 ###########
 #Variables#
 ###########
-$g_vers = "2011.9.02 Experimental";
+$g_vers = "2011.9.05 Experimental";
 $g_app = "Womz Storage Manager";
 $g_auth = "Eric Wamsley";
 $g_site = "http://ewams.net";
@@ -270,7 +270,7 @@ sub viewStorageDeviceDetails {
 		`blkid 2>&1 > /tmp/blkid`;
         #get details about device
 		chomp(my $size = `fdisk -l $device 2>&1 | awk '\$0 ~ /bytes/ && \$0 ~ /Disk/ {print \$5}'`);
-		chomp(my $sectorsize = `fdisk -luc /dev/sdd | awk '\$0 ~ /Sector size/ { print \$4 }'`);
+		chomp(my $sectorsize = `fdisk -luc $device 2>&1 | awk '\$0 ~ /Sector size/ { print \$4 }'`);
 		$size = &convertSize($size);	
 		my @partitions = `cat /tmp/fdisk | awk '{ print \$1 }'`;
 
@@ -326,6 +326,7 @@ sub viewStorageDeviceDetails {
 	}#end else
 
 }#end function viewStorageDeviceDetails
+
 
 #Function viewPartitionInfo
 #Prints a table of various information regarding a partition.
