@@ -371,9 +371,20 @@ sub viewPartitionInfo {
 	}#end if
     #get filesystem type
 	chomp(my $fstype = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$3 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+    if(length($fstype) < 1){
+        $fstype = " and has no filesystem";
+    }#end if
+    else{
+        $fstype = "and has a filesystem type of $fstype";
+    }#end else
     #get mount location
 	chomp(my $mountloc = `cat /etc/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
-
+    if(length($mountloc) < 1){
+        $mountloc = " and no mount location";
+    }#end if
+    else{
+        $mountloc = " and mounted on $mountloc";
+    }#end else
     #print results of all data found
 	if($isextended =~ m/yes/){
 		print "Partition found: $partition is an Extended partition \t\t\t\tSize is $totalsize\n";
@@ -382,8 +393,15 @@ sub viewPartitionInfo {
 		print "Partition found: $partition is System swap \t\t\t\t\tSize is $totalsize\n";
 	}#end elsif
 	else{
+	   #get free space percentage
 		chomp(my $free = `df -h $mountloc 2>&1 | awk '\$0 ~ /$workingpart/ { print 100-\$5 }'`);
-		print "Partition found: $partition$isbootable and has a filesystem type of $fstype mounted on $mountloc \tSize is $totalsize with $free \% free\n";
+        if(length($free) > 0){
+            $free = " with $free\% free"
+        }#end if
+        else{
+            $free = "";
+        }#end else
+		print "Partition found: $partition$isbootable$fstype$mountloc \tSize is $totalsize$free\n";
 	}#end else
 
 }#end function viewPartitionInfo
