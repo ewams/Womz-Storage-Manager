@@ -399,7 +399,7 @@ sub printAllDiskInfo {
 	my $diskcount = 0;
 	my $totalsize = 0;
 	print "\n\nStorage found on this system:\n";
-	foreach $line (@disks){
+	foreach my $line (@disks){
 		my $diskname = $line;
 		chomp($diskname);
 		my $disksize = `fdisk -l $diskname 2>&1 | awk '\$0 ~ /bytes/ && \$0 ~ /Disk/ {print \$5}'`;
@@ -476,7 +476,7 @@ sub viewStorageDeviceDetails {
 		
 		my $totalparts = 0;
         #print partition information
-		foreach $part (@partitions){
+		foreach my $part (@partitions){
 			chomp($part);
 			&viewPartitionInfo($device, $part);
 			$totalparts++;
@@ -506,6 +506,8 @@ sub viewPartitionInfo {
     #get just partition name without /dev/ on it
 	my @split = split("/",$partition);    
 	chomp(my $workingpart = $split[2]);
+    `fdisk -luc $device 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$0 }' > /tmp/fdisk`;
+	`blkid 2>&1 > /tmp/blkid`;
     #see if partition is bootable
 	chomp(my $isbootable = `cat /tmp/fdisk | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
     #see if device is a swap partition
@@ -513,13 +515,13 @@ sub viewPartitionInfo {
     #see if it is an extended partition
 	chomp(my $isextended = `cat /tmp/fdisk | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
     #get size of sectors from the device the partition is on
-	chomp(my $sectorsize = `fdisk -luc $device | awk '\$0 ~ /Sector size/ { print \$4 }'`);
+	chomp(my $sectorsize = `fdisk -luc $device 2>&1 | awk '\$0 ~ /Sector size/ { print \$4 }'`);
 	my $sectorsend;
 	my $sectorstart;
 	if($isbootable =~ m/yes/){
 		chomp($sectorsend = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$4 }'`);
 		chomp($sectorstart = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$3 }'`);
-        $isbootable = " is bootable";
+        $isbootable = " is bootable and";
 	}#end if
 	else{
 		chomp($sectorsend = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$3 }'`);
@@ -537,10 +539,10 @@ sub viewPartitionInfo {
     #get filesystem type
 	chomp(my $fstype = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$3 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
     if(length($fstype) < 1){
-        $fstype = " and has no filesystem";
+        $fstype = " has no filesystem";
     }#end if
     else{
-        $fstype = "and has a filesystem type of $fstype";
+        $fstype = " has a filesystem type of $fstype";
     }#end else
     #get mount location
 	chomp(my $mountloc = `cat /etc/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
@@ -548,14 +550,14 @@ sub viewPartitionInfo {
         $mountloc = " and no mount location";
     }#end if
     else{
-        $mountloc = " and mounted on $mountloc";
+        $mountloc = " mounted on $mountloc";
     }#end else
     #print results of all data found
 	if($isextended =~ m/yes/){
-		print "Partition found: $partition is an Extended partition \t\t\t\tSize is $totalsize\n";
+		print "$partition is an Extended partition \t\t\t\tSize is $totalsize\n";
 	}#end if
 	elsif($isswap =~ m/yes/){
-		print "Partition found: $partition is System swap \t\t\t\t\tSize is $totalsize\n";
+		print "$partition is System swap \t\t\t\t\tSize is $totalsize\n";
 	}#end elsif
 	else{
 	   #get free space percentage
@@ -566,7 +568,7 @@ sub viewPartitionInfo {
         else{
             $free = "";
         }#end else
-		print "Partition found: $partition$isbootable$fstype$mountloc \tSize is $totalsize$free\n";
+		print "$partition$isbootable$fstype$mountloc \tSize is $totalsize$free\n";
 	}#end else
 
 }#end function viewPartitionInfo
@@ -588,7 +590,30 @@ sub testStorageDevice {
 #Params: n/a
 #Returns: n/a
 sub viewAllPartitions {
+    print "\n\nAll partitions found:\n";
     
+    #create list of disks in tmp file
+	&getDisks();
+    my $disksfile = "/tmp/disks";
+    open(DISKSFH, $disksfile);
+    my @disks = <DISKSFH>;
+    close(DISKSFH);
+
+    #run through each device
+    foreach my $line (@disks){
+        my $devicename = $line;
+        chomp($devicename);
+
+        #get all partitions for device
+        my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
+        foreach $part (@partitions){
+			chomp($part);
+			&viewPartitionInfo($device, $part);
+			$totalparts++;
+		}#end foreach
+    }#end foreach
+	
+
 }#end function viewAllPartitions
 
 #####
