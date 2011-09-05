@@ -9,11 +9,10 @@
 #duplicated and viewable in all forms and that any documentation,   #
 #advertising materials, and other materials related to such         #
 #distribution and use acknowledge that the software was developed   #
-#by ERIC WAMSLEY.                                                   #
-#                                                                   #
-#THIS SOFTWARE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR       #
-#IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED     #
-#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.#
+#by ERIC WAMSLEY. THIS SOFTWARE IS PROVIDED "AS IS" AND WITHOUT     # 
+#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION,  #
+#THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A        #
+#PARTICULAR PURPOSE.                                                #
 ##############################LICENSE################################
 
 
@@ -25,7 +24,6 @@ $g_app = "Womz Storage Manager";
 $g_auth = "Eric Wamsley";
 $g_site = "http://ewams.net";
 $g_firstmsg = "This is an EXPERIMENTAL version of the software. Running it on any system is at YOUR OWN risk.";
-$g_option;
 $g_tempdir = "/tmp";
 
 system("clear");
@@ -56,26 +54,26 @@ sub mainMenu {
 	print "5 - Install S.M.A.R.T. and RAID tools\n";
 	print "6 - Exit\n";
 	print "Enter a choice (or exit): ";
-	chomp($g_option = <>);
+	chomp(my $option = <>);
 
     #determine user choice and execute that function
-	if($g_option == 1){
+	if($option == 1){
 		&menuStorageDevicesTop();
 	}#end if
-	elsif($g_option == 2){
+	elsif($option == 2){
 		&mainMenu();
 	}#end elsif
-	elsif($g_option == 3){
+	elsif($option == 3){
 		&mainMenu();
 	}#end elsif
-	elsif($g_option == 4){
+	elsif($option == 4){
 		&mainMenu();
 	}#end elsif
-	elsif($g_option == 5){
+	elsif($option == 5){
 		&installTools();
 		&mainMenu();
 	}#end elsif
-	elsif(($g_option == 6) || ($g_option eq "exit")){
+	elsif(($option == 6) || ($option eq "exit")){
 		&quit();
 	}#end elsif
 	else{
