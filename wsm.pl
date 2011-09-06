@@ -61,12 +61,14 @@ sub mainMenu {
 		&menuStorageDevicesTop();
 	}#end if
 	elsif($option == 2){
+        print "\nTODO\n";
 		&mainMenu();
 	}#end elsif
 	elsif($option == 3){
 		&menuPartitionsTop();
 	}#end elsif
 	elsif($option == 4){
+        print "\nTODO\n";
 		&mainMenu();
 	}#end elsif
 	elsif($option == 5){
@@ -151,6 +153,7 @@ sub menuPartitionsTop {
         &menuPartitionsTop();
     }#end if
     elsif($option == 2){
+        &createNewPartition();
         &menuPartitionsTop();
     }#end elsif
     elsif($option == 3){
@@ -217,7 +220,7 @@ sub getDisks {
 #0 - String - Reason for exit
 #Returns: n/a
 sub quit {
-    `rm -rf /tmp/blkid /tmp/disks /tmp/fdisk /tmp/hostscan /tmp/smart`;
+    `rm -rf /tmp/blkid /tmp/disks /tmp/fdisk /tmp/hostscan /tmp/smart /tmp/ofile`;
 	my($reason) = @_;
 	die $reason."\nHave a nice day.\n";
 }#end quit function
@@ -506,7 +509,7 @@ sub viewPartitionInfo {
     #get just partition name without /dev/ on it
 	my @split = split("/",$partition);    
 	chomp(my $workingpart = $split[2]);
-    `fdisk -luc $device 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$0 }' > /tmp/fdisk`;
+    `fdisk -luc $device 2>&1 | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' > /tmp/fdisk`;
 	`blkid 2>&1 > /tmp/blkid`;
     #see if partition is bootable
 	chomp(my $isbootable = `cat /tmp/fdisk | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
@@ -600,9 +603,8 @@ sub viewAllPartitions {
     close(DISKSFH);
 
     #run through each device
-    foreach my $line (@disks){
-        my $devicename = $line;
-        chomp($devicename);
+    foreach my $line (@disks){ 
+        chomp(my $devicename = $line);
 
         #get all partitions for device
         my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
@@ -611,10 +613,105 @@ sub viewAllPartitions {
 			&viewPartitionInfo($device, $part);
 			$totalparts++;
 		}#end foreach
-    }#end foreach
-	
+    }#end foreach	
 
 }#end function viewAllPartitions
+
+
+#Function createNewPartition
+#Creates a new partition on a specified device.
+#Params: n/a
+#Returns: n/a
+sub createNewPartition {
+    print "\n\nCreate a new partition.\nWhich device do you want the new partition on?\n";
+    &getDisks();
+    my $disksfile = "/tmp/disks";
+    my $counter = 1;
+	my $diskchoice = 0;
+    open(DISKSFH, $disksfile);
+    my @disks = <DISKSFH>;
+    close(DISKSFH);
+    
+    my @deviceoptions;
+    
+    #print menu with each device
+    foreach my $line (@disks){
+        chomp(my $devicename = $line);
+        
+        #get some details about the device
+        chomp(my $sectorsize = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /Sector size/ { print \$4 }'`);
+        chomp(my $totalsectors = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /heads/ { print \$8 }'`);
+        `fdisk -luc $devicename 2>&1 | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' > /tmp/fdisk`;
+        
+        my $remainingsectors = $totalsectors;
+        my $totalpartitions = 0;
+        #get all partitions for device
+        my @partitions = `fdisk -l $devicename 2>&1 | awk '(\$0 ~ /md/ || \$0 ~ /sd/) && \$0 !~ /Disk/ { print \$1 }'`;
+        foreach my $part (@partitions){
+			chomp($part);
+            my @split = split("/",$part);    
+            chomp(my $workingpart = $split[2]);
+            
+            chomp(my $isextended = `cat /tmp/fdisk | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
+            chomp(my $isbootable = `cat /tmp/fdisk | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
+    
+        	my $sectorsused = 0;
+        	if($isbootable =~ m/yes/){
+        		chomp($sectorsused = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$4-\$3 }'`);
+        	}#end if
+        	else{
+        		chomp($sectorsused = `cat /tmp/fdisk | awk '\$0 ~ /$workingpart/ { print \$3-\$2 }'`);
+        	}#end else
+            
+            if($isextended =~ m/no/){
+                $remainingsectors = $remainingsectors - $sectorsused;
+            }#end if
+			
+            $totalpartitions++;
+		}#end foreach
+        $remainingsectors = $remainingsectors - ($totalpartitions * 2048);
+        my $remainingspace = &convertSize($remainingsectors*$sectorsize);
+        if($remainingsectors > 4100){
+            $deviceoptions[$counter] = $devicename;
+            print "$counter - $devicename - $remainingspace available\n";
+            $counter++;
+        }#end if      
+        
+    }#end foreach
+	$counter--;
+    
+    #get user input
+    print "\nEnter a device number: ";
+    chomp($diskchoice = <>);
+	if (($diskchoice <= $counter) && ($diskchoice > 0)){
+        my $workingdevice = $deviceoptions[$diskchoice];
+		
+        #see if there is an extended partition on specified device
+        chomp(my $hasextended = `fdisk -luc $workingdevice 2>&1 | awk '/Extended/ { ++x } END {if ( x>=1 ) print "yes"; else print "no"}'`);
+        if($hasextended =~ m/no/){
+            print "\n\nThe device $workingdevice does not have a logical partition container. Would you like to create one now?\n\n";
+            print "If you only want primary partitions type \"no\".\n";
+            print "If you want to create multiple extended partitions type \"no\".";
+            print "\n\nChoice (yes or no): ";
+            chomp(my $extendchoice = <>);
+            
+            if($extendchoice eq "yes"){
+                print "\n\nCreating logical partition container.\n";
+                #New, Extended, 1 (partition number), default first sector, default last sector, Write
+                open(OFILE, '>/tmp/ofile');
+                print OFILE "n\ne\n1\n\n\nw\n";
+                close(OFILE);
+                `fdisk -uc $workingdevice 2>&1 < /tmp/ofile`;
+            }#end if
+        }#end if
+	}#end if
+    else{
+        #user put in bad info, byebye
+    }#end else
+    
+    
+}#end function createNewPartition
+
 
 #####
 #EOF#
