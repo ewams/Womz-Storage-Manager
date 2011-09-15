@@ -158,6 +158,7 @@ sub menuPartitionsTop {
         &menuPartitionsTop();
     }#end elsif
     elsif($option == 3){
+        &deletePartition();
         &menuPartitionsTop();
     }#end elsif
     elsif($option == 4){
@@ -834,6 +835,67 @@ sub createNewPartition {
        
 }#end function createNewPartition
 
+#Function deletePartition
+#Gives a list of partitions and allows them to be deleted.
+#Params: n/a
+#Returns: n/a
+sub deletePartition{
+    
+    print "\n\n";
+    print "Which partition do you want to delete?\n";
+    
+    #create list of disks in tmp file
+	&getDisks();
+    my $disksfile = "/tmp/disks";
+    open(DISKSFH, $disksfile);
+    my @disks = <DISKSFH>;
+    close(DISKSFH);
+
+    #run through each device
+    my $counter = 1;
+    my @allpartitions;
+    foreach my $line (@disks){ 
+        chomp(my $devicename = $line);
+
+        #get all partitions for device
+        my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
+        foreach my $part (@partitions){
+			chomp($part);
+			print "$counter - $part\n";
+            $allpartitions[$counter] = $part;
+            $counter++;
+		}#end foreach
+    }#end foreach
+    $counter--;
+    
+    print "Choice: ";
+    chomp(my $choice = <>);
+    
+    if(($choice > 0) && ($choice <= $counter)){
+        my $workingpartition = $allpartitions[$choice];
+        print "\n\nAre you sure you want to delete $workingpartition?\n";
+        print "Choice (yes or no): ";
+        chomp(my $confirm = <>);
+        
+        if($confirm =~ m/yes/){
+            my $workingdevice = $workingpartition;
+            $workingdevice =~ s/[0-9]+//;
+            my $partitionnum = $workingpartition;
+            $partitionnum =~ s/\/dev\/[sh]d[a-z]//;
+            #Delete, partition number, Write
+            open(OFILE, '>/tmp/ofile');
+            print OFILE "d\n$partitionnum\nw\n";
+            close(OFILE);
+            `fdisk -uc $workingdevice 2>&1 < /tmp/ofile`;
+        }#end if confirm
+        else{
+            print "\n\nWill not delete $workingpartition.\n";
+        }#end else
+    }#end if valid partition
+    else{
+        print "\n\nInvalid partition.\n";
+    }#end else
+}#end function deletePartition
 
 #####
 #EOF#
