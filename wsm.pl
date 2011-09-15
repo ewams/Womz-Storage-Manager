@@ -19,12 +19,13 @@
         ###########
         #Variables#
         ###########
-$g_vers = "2011.9.05 Experimental";
-$g_app = "Womz Storage Manager";
-$g_auth = "Eric Wamsley";
-$g_site = "http://ewams.net";
-$g_firstmsg = "This is an EXPERIMENTAL version of the software. Running it on any system is at YOUR OWN risk.";
-$g_tempdir = "/tmp";
+use strict;        
+my $g_vers = "2011.9.15 Experimental";
+my $g_app = "Womz Storage Manager";
+my $g_auth = "Eric Wamsley";
+my $g_site = "http://ewams.net";
+my $g_firstmsg = "This is an EXPERIMENTAL version of the software. Running it on any system is at YOUR OWN risk.";
+my $g_tempdir = "/tmp";
 
 system("clear");
 
@@ -277,7 +278,7 @@ sub selectDevice {
     close(DISKSFH);
     
     #print menu with each device
-    foreach $line (@disks){
+    foreach my $line (@disks){
         my $diskname = $line;
         chomp($diskname);
         print "$counter - $diskname\n";
@@ -379,7 +380,7 @@ sub scanNewDevices {
 	close(CMDFH);
 	print "\n\nPerforming rescan for new storage devices.\n";
     #Rescan each port
-	foreach $line (@cmds){
+	foreach my $line (@cmds){
 		chomp($line);
 		system($line);
 		print "Scan complete.\n";
@@ -502,7 +503,6 @@ sub viewStorageDeviceDetails {
 #0 - String - Device name that partition is on
 #1 - String - Partition name to get info about
 #Returns: n/a
-#TODO - test partition for no filesystem, no mounts, and no space used/free#
 sub viewPartitionInfo {
     my($device) = $_[0];
 	my($partition) = $_[1];
@@ -560,7 +560,7 @@ sub viewPartitionInfo {
 		print "$partition is an Extended partition \t\t\t\tSize is $totalsize\n";
 	}#end if
 	elsif($isswap =~ m/yes/){
-		print "$partition is System swap \t\t\t\t\tSize is $totalsize\n";
+		print "$partition is System Swap \t\t\t\t\tSize is $totalsize\n";
 	}#end elsif
 	else{
 	   #get free space percentage
@@ -608,10 +608,9 @@ sub viewAllPartitions {
 
         #get all partitions for device
         my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
-        foreach $part (@partitions){
+        foreach my $part (@partitions){
 			chomp($part);
-			&viewPartitionInfo($device, $part);
-			$totalparts++;
+			&viewPartitionInfo($devicename, $part);
 		}#end foreach
     }#end foreach	
 
@@ -691,7 +690,6 @@ sub createNewPartition {
         if($hasextended =~ m/no/){
             print "\n\nThe device $workingdevice does not have a logical partition container. Would you like to create one now?\n\n";
             print "If you only want primary partitions type \"no\".\n";
-            print "If you want to create multiple extended partitions type \"no\".";
             print "\n\nChoice (yes or no): ";
             chomp(my $extendchoice = <>);
             
@@ -703,6 +701,101 @@ sub createNewPartition {
                 close(OFILE);
                 `fdisk -uc $workingdevice 2>&1 < /tmp/ofile`;
             }#end if
+        }#end if
+        
+        print "\n\n";
+        print "What do you want to define the size of the partition in?\n";
+        print "1 - Sectors\n";
+        print "2 - KiloBytes\n";
+        print "3 - MegaBytes\n";
+        print "4 - GigaBytes\n";
+        print "5 - TeraBytes\n";
+        print "Choice: ";
+        chomp(my $sizetype = <>);
+        if(($sizetype >= 1) && ($sizetype <= 5)){
+            #get all partitions for device
+            my @partitions = `fdisk -l $workingdevice 2>&1 | awk '(\$0 ~ /md/ || \$0 ~ /sd/) && \$0 !~ /Disk/ { print \$1 }'`;
+            chomp(my $sectorsize = `fdisk -luc $workingdevice 2>&1 | awk '\$0 ~ /Sector size/ { print \$4 }'`);
+            chomp(my $totalsectors = `fdisk -luc $workingdevice 2>&1 | awk '\$0 ~ /heads/ { print \$8 }'`);
+
+            my $remainingsectors = $totalsectors;
+            my $totalpartitions = 0;
+            foreach my $part (@partitions){
+    			chomp($part);
+                my @split = split("/",$part);    
+                chomp(my $workingpart = $split[2]);
+
+                chomp(my $isextended = `fdisk -luc $workingdevice 2>&1 | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
+                chomp(my $isbootable = `fdisk -luc $workingdevice 2>&1 | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
+        
+            	my $sectorsused = 0;
+            	if($isbootable =~ m/yes/){
+            		chomp($sectorsused = `fdisk -luc $workingdevice 2>&1 | awk '\$0 ~ /$workingpart/ { print \$4-\$3 }'`);
+            	}#end if
+            	else{
+            		chomp($sectorsused = `fdisk -luc $workingdevice 2>&1 | awk '\$0 ~ /$workingpart/ { print \$3-\$2 }'`);
+            	}#end else
+                
+                if($isextended =~ m/no/){
+                    $remainingsectors = $remainingsectors - $sectorsused;
+                }#end if
+    			
+                $totalpartitions++;
+    		}#end foreach
+            $remainingsectors = $remainingsectors - ($totalpartitions * 2048);
+            my $remainingspace = &convertSize($remainingsectors*$sectorsize);
+            
+            
+            print "\n\n";
+            print "Enter the size of the new partition in ";
+            if($sizetype == 1){
+                print "sectors";
+            }#end if
+            elsif($sizetype == 2){
+                print "KB";
+            }#end elseif
+            elsif($sizetype == 3){
+                print "MB";
+            }#end elseif
+            elsif($sizetype == 4){
+                print "GB";
+            }#end elseif
+            elsif($sizetype == 5){
+                print "TB";
+            }#end elseif
+            print " (max of $remainingspace or $remainingsectors sectors):";
+            chomp(my $partsize = <>);
+            
+            #convert size of new partition to bytes
+            if($sizetype == 1){
+                $partsize = $partsize * $sectorsize;
+            }#end if
+            if($sizetype >= 2){
+                $partsize = $partsize * 1024;
+            }#end if
+            if($sizetype >= 3){
+                $partsize = $partsize * 1024;
+            }#end if
+            if($sizetype >= 4){
+                $partsize = $partsize * 1024;
+            }#end if
+            if($sizetype >= 5){
+                $partsize = $partsize * 1024;
+            }#end if
+            
+            #get new partition size in sectors
+            my $partsizesectors = $partsize/$sectorsize;
+            
+            if($partsizesectors <= $remainingsectors){            
+                #do work
+                print "\n\n";
+                my $displaysize = &convertSize($partsize);
+                print "Are you sure you want to create a new partition that is $displaysize on $workingdevice?\n";
+                print "Type yes or no to create partition:"; 
+            }#end if
+            #New, Logical, default first sector, last sector, Write
+            #n\nl\n\n$sectors+sectors\n\w
+            
         }#end if
 	}#end if
     else{
