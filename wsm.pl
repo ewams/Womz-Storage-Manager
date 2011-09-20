@@ -20,7 +20,7 @@
         #Variables#
         ###########
 use strict;        
-my $g_vers = "2011.9.15 Experimental";
+my $g_vers = "2011.9.20 Experimental";
 my $g_app = "Womz Storage Manager";
 my $g_auth = "Eric Wamsley";
 my $g_site = "http://ewams.net";
@@ -541,7 +541,10 @@ sub viewPartitionInfo {
 		$uuid = "None";
 	}#end if
     #get filesystem type
-	chomp(my $fstype = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$3 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+    #old way
+	#chomp(my $fstype = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$3 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+    #new way, b/c some fstypes have additional blkid info like uuid_sub and sec_type, etc.
+    chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS="\\" TYPE=\\""} \$0 ~ /$workingpart/ {sub(/\\"/, "", \$2); print \$2}'`);
     if(length($fstype) < 1){
         $fstype = " has no filesystem";
     }#end if
@@ -551,10 +554,10 @@ sub viewPartitionInfo {
     #get mount location
 	chomp(my $mountloc = `cat /etc/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
     if(length($mountloc) < 1){
-        $mountloc = " and no mount location";
+        $mountloc = "and no mount location";
     }#end if
     else{
-        $mountloc = " mounted on $mountloc";
+        $mountloc = "mounted on $mountloc";
     }#end else
     #print results of all data found
 	if($isextended =~ m/yes/){
