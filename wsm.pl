@@ -49,7 +49,7 @@ system("clear");
 sub mainMenu {
 	print "\n\nMain Menu\nWhat would you like to manage?\n";
 	print "1 - Physical Storage Devices\n";
-	print "2 - RAID devices\n";
+	print "2 - RAID Devices\n";
 	print "3 - Partitions\n";
 	print "4 - FileSystems\n";
 	print "5 - Install S.M.A.R.T. and RAID tools\n";
@@ -800,10 +800,12 @@ sub createNewPartition {
                     print "\n\n";
                     my $displaysize = &convertSize($partsize);
                     print "Are you sure you want to create a new partition that is $displaysize on $workingdevice?\n";
-                    print "Type yes or no to create partition: "; 
+                    print "Type yes to create partition the partition, or no to cancel: "; 
                     
                     chomp(my $confirm = <>);
                     if($confirm =~ m/yes/){
+                        #remove decimal places
+                        $partsizesectors = sprintf("%.0f", $partsizesectors);
                         #New, Logical, default first sector, last sector, Write
                         open(OFILE, '>/tmp/ofile');
                         print OFILE "n\nl\n\n\+$partsizesectors\nw\n";
@@ -834,6 +836,7 @@ sub createNewPartition {
     }#end else
        
 }#end function createNewPartition
+
 
 #Function deletePartition
 #Gives a list of partitions and allows them to be deleted.
