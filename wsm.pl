@@ -53,7 +53,7 @@ sub mainMenu {
 	print "2 - RAID Devices\n";
 	print "3 - Partitions\n";
 	print "4 - FileSystems\n";
-	print "5 - Install S.M.A.R.T. and RAID tools\n";
+	print "5 - Install Storage Tools\n";
 	print "6 - Exit\n";
 	print "Enter a choice (or exit): ";
 	chomp(my $option = <>);
@@ -341,38 +341,82 @@ sub selectDevice {
 }#end function selectDevice
 
 
-
 #Function installTools
 #Checks for smartctl and mdadm. If not installed installs them.
 #Params: n/a
 #Returns: n/a
 sub installTools {
-    #see if smartctl is installed on the system. if it is do nothing, if not install it
-	if(&testSmartctl() eq "true"){
-		print "\nsmartctl was found on this system and will not be reinstalled.";
-	}#end if
-	else {
-		print "\nsmartctl will now be installed.";
-		print "Depending on your Internet connection this may take several minutes.\n";
-		my @result = `apt-get -y install smartmontools 2>&1`;
-   		foreach my $i (@result){
-            print $i;
-       	}#end foreach
-	}#end else
-    
-    #see if mdadm is installed on the system. if it is do nothing, if not install it
-	if(&testMdadm() eq "true"){
-		print "\nmdadm was found on this system and will not be reinstalled.\n";
-	}#end if
-	else{
-        print "\nmdadm will now be installed.\n";
-        print "Depending on your Internet connection this may take several minutes.\n";
-        my @result = `apt-get -y install mdadm 2>&1`;
-        foreach my $i (@result){
-            print $i;
-        }#end foreach
-    }#end else
+    #get package manager on system
+    chomp(my $pkgmgr = &testPackageMgr());
+    if($pkgmgr =~ m/none/){
+        print "\nNo package manager found on your system. Please manually install the packages: smartmontools, mdadm, and parted.\n";
+    }#end if no package manager
+        else{
+            #see if smartctl is installed on the system. if it is do nothing, if not install it
+    	if(&testSmartctl() eq "true"){
+    		print "\nsmartctl was found on this system and will not be reinstalled.\n";
+    	}#end if
+    	else {
+    		print "\nsmartctl will now be installed.\n";
+    		print "Depending on your Internet connection this may take several minutes.\n";
+    		my @result = `$pkgmgr -y install smartmontools 2>&1`;
+       		foreach my $i (@result){
+                print $i;
+           	}#end foreach
+    	}#end else
+        
+        #see if mdadm is installed on the system. if it is do nothing, if not install it
+    	if(&testMdadm() eq "true"){
+    		print "\nmdadm was found on this system and will not be reinstalled.\n";
+    	}#end if
+    	else{
+            print "\nmdadm will now be installed.\n";
+            print "Depending on your Internet connection this may take several minutes.\n";
+            my @result = `$pkgmgr -y install mdadm 2>&1`;
+            foreach my $i (@result){
+                print $i;
+            }#end foreach
+        }#end else
+        
+        
+        #see if partprobe is installed on the system. if it is do nothing, if not install it
+    	if(&testPartprobe() eq "true"){
+    		print "\npartprobe (parted) was found on this system and will not be reinstalled.\n";
+    	}#end if
+    	else{
+            print "\npartprobe (parted) will now be installed.\n";
+            print "Depending on your Internet connection this may take several minutes.\n";
+            my @result = `$pkgmgr -y install parted 2>&1`;
+            foreach my $i (@result){
+                print $i;
+            }#end foreach
+        }#end else
+    }#end if yum or apt   
 }#end function installTools
+
+
+#Function testPackageMgr
+#Checks to see if system package manager is apt or yum.
+#Params: n/a
+#Returns:
+#0 - text - "apt-get" if apt is installed - "yum" if yum is installed - "none" if could not detect a package manager
+sub testPackageMgr {
+    #test for yum
+    my $result = `yum --version 2>&1 | awk 'BEGIN {x=0} \$0 ~ /not found/ {++x} END {if (x == 0) print "pass"; else print "fail"}'`;
+    if($result =~ m/pass/){
+        return "yum";
+    }#end if
+    else{
+        #check for apt
+        $result = `apt-get -v 2>&1 | awk 'BEGIN {x=0} \$0 ~ /not found/ {++x} END {if (x == 0) print "pass"; else print "fail"}'`;
+        if($result =~ m/pass/){
+            return "apt-get";
+        }#end if
+        else{
+            return "none";
+        }#end else
+    }#end else
+}#end function testPackageMgr
 
 
 #Function testSmartctl
@@ -405,6 +449,22 @@ sub testMdadm {
             return "false";
         }#end else
 }#end function testMdadm
+
+
+#Function testPartprobe
+#Checks if partprobe is installed.
+#Params: n/a
+#Returns:
+#0 - boolean - true if partprobe is installed - false if partprobe is NOT installed
+sub testPartprobe {
+        my $result = `partprobe -v 2>&1 | awk '/GNU parted/ {++x} END {if (x == 1) print "pass"; else print "fail"}'`;
+        if($result =~ m/pass/){
+            return "true";
+        }#end if
+        else{
+            return "false";
+        }#end else
+}#end function testPartprobe
 
 
 #Function scanNewDevices
@@ -957,25 +1017,24 @@ sub createFilesystem{
     
     #get mkfs location
     chomp(my $mkfsloc = `which mkfs | awk '{sub(/mkfs/, "", \$0); print \$0}'`);
-
     
     #get all filesystems support by mkfs
     my @fsoptions = `ls $mkfsloc | awk 'BEGIN {FS = "\\."} \$0 ~ /mkfs\\./ && \$0 !~ /cramfs/ {print \$2}' | sort`;
 
-    my $counter = 1;
+    my $counter = 0;
     #print out each fs for user to select
     foreach my $fs (@fsoptions){
         chomp($fs);
-        print "$counter - $fs\n";
         $counter++;
+        print "$counter - $fs\n";
     }#end foreach
-    $counter--;
+
     print "\nIf the filesystem you want to use is not displayed then it is not currently supported on your system by mkfs.\n";
     #get fs user wants to use
     print "Enter filesystem number: ";
     chomp(my $fsselect = <>);
     
-    
+    #verify selection is legit
     if(($fsselect > 0) && ($fsselect <= $counter)){
         #get the fs name from selection
         $fsselect = $fsselect - 1;
@@ -984,8 +1043,6 @@ sub createFilesystem{
         print "\n\nCreate a filesystem\n";
         print "Which partition do you want to format with $fsselect?\n";
         
-        
-        #create a list of each partition
         #create list of disks in tmp file
     	&getDisks();
         my $disksfile = "/tmp/disks";
@@ -997,7 +1054,7 @@ sub createFilesystem{
         `blkid 2>&1 > /tmp/blkid`;
         `cat /etc/fstab 2>&1 > /tmp/fstab`;
     
-        $counter = 1;
+        $counter = 0;
         #run through each device
         my @availableparts;
         foreach my $devicename (@disks){ 
@@ -1007,6 +1064,8 @@ sub createFilesystem{
             my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
             foreach my $part (@partitions){
     			chomp($part);
+                
+                #get just the name of the device, ie sdb2 or sde6, with /dev/
                 my @split = split("/",$part);    
                 chomp(my $workingpart = $split[2]);
 
@@ -1024,14 +1083,13 @@ sub createFilesystem{
                     #see if the filesystem is mounted
                 	chomp(my $mountloc = `cat /tmp/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
                     if(length($mountloc) < 1){
-                        print "$counter - $part\n";
-                        $availableparts[$counter] = $part;
                         $counter++;
+                        print "$counter - $part\n";
+                        $availableparts[$counter] = $part; 
                     }#end if                    
                 }#end if not extended
     		}#end foreach partition
         }#end foreach device
-        $counter--;
         
         #check there are partitions available
         if($counter > 1){
