@@ -25,6 +25,7 @@ my $g_app = "Womz Storage Manager";
 my $g_auth = "Eric Wamsley";
 my $g_site = "http://ewams.net";
 my $g_firstmsg = "This is an EXPERIMENTAL version of the software. Running it on any system is at YOUR OWN risk.";
+my $g_warning = "Using this program is at *your own* risk. If you are unsure of its purpose type EXIT immediatly.\nThe author will not be held liable for any loss or damage to any data, system, time, or mental health from using this software.\nBy using this software you agree to this warning message.";
 my $g_tempdir = "/tmp";
 
 system("clear");
@@ -69,8 +70,7 @@ sub mainMenu {
 		&menuPartitionsTop();
 	}#end elsif
 	elsif($option == 4){
-        print "\nTODO\n";
-		&mainMenu();
+        &menuFilesystemsTop();
 	}#end elsif
 	elsif($option == 5){
 		&installTools();
@@ -174,6 +174,41 @@ sub menuPartitionsTop {
 }#end function menuPartitionsTop
 
 
+#Function menuFilesystemsTop
+#Top menu or the filesystems menu (option 4 from Main Menu).
+#Calls functions based on user input.
+#Params: n/a
+#Returns: n/a
+sub menuFilesystemsTop {
+    print "\n\nFilesystems\nWhat would you like to do?\n";
+    print "1 - Create a Filesystem\n";
+    print "2 - Mount a Filesystem\n";
+    print "3 - Main Menu\n";
+    print "4 - Exit\n";
+    print "Enter a choice (or exit): ";
+    chomp(my $option = <>);
+    
+    #determine user choice and run related function
+    if($option == 1){
+        &createFilesystem();
+        &menuFilesystemsTop();
+    }#end if
+    elsif($option == 2){
+        &menuFilesystemsTop();
+    }#end elsif
+    elsif($option == 3){
+        &mainMenu();
+    }#end elsif
+    elsif(($option == 4) || ($option eq "exit")){
+    	&quit();
+    }#end elsif
+    else{
+        print "\n\nPlease select an option from below.\n"
+        &menuFilesystemsTop();
+    }#end else
+}#end function menuFilesystemsTop
+
+
 
 
 
@@ -189,9 +224,10 @@ sub menuPartitionsTop {
 #Params: n/a
 #Returns: n/a
 sub printGreeting{
-	print "Running $g_app version $g_vers by $g_auth.\n";
+	print "\nRunning $g_app version $g_vers by $g_auth.\n";
 	print "Visit $g_site for more information.\n";
 	print "\n$g_firstmsg\n";
+    print "\n$g_warning\n";
 }#end function printGreeting
 
 
@@ -484,6 +520,7 @@ sub viewStorageDeviceDetails {
 		foreach my $part (@partitions){
 			chomp($part);
 			&viewPartitionInfo($device, $part);
+            print "\n";
 			$totalparts++;
 		}#end foreach
 		if($totalparts == 0){
@@ -536,23 +573,21 @@ sub viewPartitionInfo {
 	my $totalsize = ($totalsectors*$sectorsize);
 	$totalsize = &convertSize($totalsize);
     #get UUID of partition
-	chomp(my $uuid = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+	chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
 	if(length($uuid) < 12){
 		$uuid = "None";
 	}#end if
-    #get filesystem type
-    #old way
-	#chomp(my $fstype = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$3 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
-    #new way, b/c some fstypes have additional blkid info like uuid_sub and sec_type, etc.
-    chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS="\\" TYPE=\\""} \$0 ~ /$workingpart/ {sub(/\\"/, "", \$2); print \$2}'`);
+    #get filesystem type, note: some fstypes have additional blkid info like uuid_sub and sec_type, etc.
+    chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS=" TYPE=\\""} \$0 ~ /$workingpart/ {sub(/\\"/, "", \$2); print \$2}'`);
     if(length($fstype) < 1){
-        $fstype = " has no filesystem";
+        $fstype = " has no filesystem ";
     }#end if
     else{
         $fstype = " has a filesystem type of $fstype";
     }#end else
     #get mount location
 	chomp(my $mountloc = `cat /etc/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
+    #print "\n\nrunning on $workingpart: cat /etc/fstab | awk '0 ~ /$uuid/ { print 2 }'\n\n";
     if(length($mountloc) < 1){
         $mountloc = "and no mount location";
     }#end if
@@ -561,10 +596,10 @@ sub viewPartitionInfo {
     }#end else
     #print results of all data found
 	if($isextended =~ m/yes/){
-		print "$partition is an Extended partition \t\t\t\tSize is $totalsize\n";
+		print "$partition is an Extended partition \t\t\t\tSize is $totalsize";
 	}#end if
 	elsif($isswap =~ m/yes/){
-		print "$partition is System Swap \t\t\t\t\tSize is $totalsize\n";
+		print "$partition is System Swap \t\t\t\t\tSize is $totalsize";
 	}#end elsif
 	else{
 	   #get free space percentage
@@ -575,7 +610,7 @@ sub viewPartitionInfo {
         else{
             $free = "";
         }#end else
-		print "$partition$isbootable$fstype$mountloc \tSize is $totalsize$free\n";
+		print "$partition$isbootable$fstype$mountloc \tSize is $totalsize$free";
 	}#end else
 
 }#end function viewPartitionInfo
@@ -615,6 +650,7 @@ sub viewAllPartitions {
         foreach my $part (@partitions){
 			chomp($part);
 			&viewPartitionInfo($devicename, $part);
+            print "\n";
 		}#end foreach
     }#end foreach	
 
@@ -902,6 +938,138 @@ sub deletePartition{
         print "\n\nInvalid partition.\n";
     }#end else
 }#end function deletePartition
+
+
+#Function createFilesystem
+#Create a filesystem on a partition. Both the filesystem type and target partition are given as menu items.
+#Params: n/a
+#Returns: n/a
+sub createFilesystem{
+    
+    print "\n\n";
+    print "Create a filesystem\n";
+    print "Which filesystem type do you want to use?\n";
+    
+    #get mkfs location
+    chomp(my $mkfsloc = `which mkfs | awk '{sub(/mkfs/, "", \$0); print \$0}'`);
+
+    
+    #get all filesystems support by mkfs
+    my @fsoptions = `ls $mkfsloc | awk 'BEGIN {FS = "\\."} \$0 ~ /mkfs\\./ && \$0 !~ /cramfs/ {print \$2}' | sort`;
+
+    my $counter = 1;
+    #print out each fs for user to select
+    foreach my $fs (@fsoptions){
+        chomp($fs);
+        print "$counter - $fs\n";
+        $counter++;
+    }#end foreach
+    $counter--;
+    print "\nIf the filesystem you want to use is not displayed then it is not currently supported on your system by mkfs.\n";
+    #get fs user wants to use
+    print "Enter filesystem number: ";
+    chomp(my $fsselect = <>);
+    
+    
+    if(($fsselect > 0) && ($fsselect <= $counter)){
+        #get the fs name from selection
+        $fsselect = $fsselect - 1;
+        $fsselect = $fsoptions[$fsselect];
+        
+        print "\n\nCreate a filesystem\n";
+        print "Which partition do you want to format with $fsselect?\n";
+        
+        
+        #create a list of each partition
+        #create list of disks in tmp file
+    	&getDisks();
+        my $disksfile = "/tmp/disks";
+        open(DISKSFH, $disksfile);
+        my @disks = <DISKSFH>;
+        close(DISKSFH);
+    
+        $counter = 1;
+        #run through each device
+        my @availableparts;
+        foreach my $devicename (@disks){ 
+            chomp($devicename);
+    
+            #get all partitions for device
+            my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
+            foreach my $part (@partitions){
+    			chomp($part);
+                my @split = split("/",$part);    
+                chomp(my $workingpart = $split[2]);
+               
+                #make temp files for blkid and fstab
+    			`blkid 2>&1 > /tmp/blkid`;
+                `cat /etc/fstab 2>&1 > /tmp/fstab`;
+                
+                #get UUID of partition
+            	chomp(my $uuid = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+            	if(length($uuid) < 12){
+            		$uuid = "None";
+            	}#end if
+                
+                #see if partition is extended
+            	chomp(my $isextended = `fdisk -luc $devicename 2>&1 | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
+                
+                #if part is not extended continue 
+                if($isextended =~ m/no/){
+                    #see if the filesystem is mounted
+                	chomp(my $mountloc = `cat /tmp/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
+                    if(length($mountloc) < 1){
+                        print "$counter - $part\n";
+                        $availableparts[$counter] = $part;
+                        $counter++;
+                    }#end if                    
+                }#end if not extended
+                
+
+
+    		}#end foreach partition
+        }#end foreach device
+        
+        #check there are partitions available
+        if($counter > 1){
+            print "\nEnter partition number: ";
+            chomp(my $partitionchoice = <>);
+            
+            #check valid partition chosen
+            if(($partitionchoice > 0) && ($partitionchoice <= $counter)){
+                #get selected partition
+                my $partselect = $availableparts[$partitionchoice];
+                
+                print "Are you sure you want to format $partselect with $fsselect?\n";
+                print "Choice (yes or no): ";
+                chomp(my $confirm = <>);
+                
+                if($confirm =~ m/yes/){
+                    open(OFILE, '>/tmp/ofile');
+                    print OFILE "yes\n";
+                    close(OFILE);
+                    `mkfs.$fsselect $partselect 2>&1 < /tmp/ofile > /dev/null`;
+                }#end if
+                else{
+                    print "\nThe partition will not be formatted.\n";
+                }#end else
+            }#end if valid part
+            else{
+                print "\nInvalid partition.\n";
+            }#end else
+        }#end if available partitions found to format
+        else{
+            print "\nThere are no available unmounted partitions to format.\n";
+        }#end else no available partitions
+        
+    }#end if valid fs type
+    else{
+        print "\nInvalid filesystem.\n";
+    }#end else
+
+
+}#end function createFilesystem
+
 
 #####
 #EOF#
