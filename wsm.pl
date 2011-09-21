@@ -744,7 +744,7 @@ sub viewAllPartitions {
 #Params: n/a
 #Returns: n/a
 sub createNewPartition {
-    print "\n\nCreate a new partition.\nWhich device do you want the new partition on?\n";
+    print "\n\nCreate a new partition\nWhich device do you want the new partition on?\n";
     &getDisks();
     my $disksfile = "/tmp/disks";
     my $counter = 1;
@@ -980,7 +980,7 @@ sub deletePartition{
     close(DISKSFH);
 
     #run through each device
-    my $counter = 1;
+    my $counter = 0;
     my @allpartitions;
     foreach my $line (@disks){ 
         chomp(my $devicename = $line);
@@ -989,12 +989,11 @@ sub deletePartition{
         my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
         foreach my $part (@partitions){
 			chomp($part);
-			print "$counter - $part\n";
-            $allpartitions[$counter] = $part;
             $counter++;
+			print "$counter - $part\n";
+            $allpartitions[$counter] = $part;   
 		}#end foreach
     }#end foreach
-    $counter--;
     
     print "Choice: ";
     chomp(my $choice = <>);
@@ -1015,6 +1014,9 @@ sub deletePartition{
             #get the partition number
             my $partitionnum = $workingpartition;
             $partitionnum =~ s/\/dev\/[sh]d[a-z]//;
+            
+            #zero out first 10MB of partition
+            `dd if=/dev/zero of=$workingpartition bs=1M count=10 2>&1 > /dev/null`;
             
             #Delete, partition number, Write
             open(OFILE, '>/tmp/ofile');
