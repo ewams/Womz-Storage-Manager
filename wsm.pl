@@ -264,7 +264,7 @@ sub getDisks {
 #Returns: n/a
 sub quit {
     `rm -rf /tmp/blkid /tmp/disks /tmp/fdisk /tmp/hostscan /tmp/smart /tmp/ofile`;
-	my($reason) = @_;
+	chomp(my($reason) = @_);
 	die $reason."\nHave a nice day.\n";
 }#end quit function
 
@@ -519,6 +519,23 @@ sub printAllDiskInfo {
 
 }#end function printAllDiskInfo
 
+
+#Function performPartprobe
+#Runs the partprobe command if available
+#Params:
+#0 - storage device (eg: /dev/sda or /dev/sdg)
+#Returns: n/a
+sub performPartprobe {
+    my $device = @_;
+    #see if partprobe is available
+    if(&testPartprobe() eq "true"){
+        #rescan disk and let kernel know if changes
+        `partprobe $device 2>&1 > /dev/null`;
+    }#end if partprobe
+    else{
+        print "\nYou should install storage tools from the main menu or reboot your system before performing other work to this device so your operating system can properly detect the changes.\n";
+    }#end else no partprobe
+}#end function performPartprobe
 
 #Function viewStorageDeviceDetails
 #Creates menu item (from &selectDevice()) of devices, lets user pick one, prints out details of device, and prints out details of partitions (from &viewPartitionInfo()).
@@ -898,14 +915,14 @@ sub createNewPartition {
                     $partsizesectors = $partsizesectors - 10;
                 }#end if
                 
-                
+                #check space is available
                 if($partsizesectors <= $remainingsectors){            
-                    #do work
                     print "\n\n";
                     my $displaysize = &convertSize($partsize);
                     print "Are you sure you want to create a new partition that is $displaysize on $workingdevice?\n";
                     print "Type yes to create partition the partition, or no to cancel: "; 
                     
+                    #see if user confirms changes
                     chomp(my $confirm = <>);
                     if($confirm =~ m/yes/){
                         #remove decimal places
@@ -914,7 +931,11 @@ sub createNewPartition {
                         open(OFILE, '>/tmp/ofile');
                         print OFILE "n\nl\n\n\+$partsizesectors\nw\n";
                         close(OFILE);
+                        #create partition
                         `fdisk -uc $workingdevice 2>&1 < /tmp/ofile`;
+                        
+                        #run partprobe to update kernel
+                        &performPartprobe($workingdevice);
                     }#end if confirm
                     else{
                         print "\n\nWill not create partition.\n";
@@ -978,22 +999,31 @@ sub deletePartition{
     print "Choice: ";
     chomp(my $choice = <>);
     
+    #check partition is valid
     if(($choice > 0) && ($choice <= $counter)){
         my $workingpartition = $allpartitions[$choice];
         print "\n\nAre you sure you want to delete $workingpartition?\n";
         print "Choice (yes or no): ";
         chomp(my $confirm = <>);
         
+        #confirm user wants to delete partition
         if($confirm =~ m/yes/){
+            #get the device name
             my $workingdevice = $workingpartition;
             $workingdevice =~ s/[0-9]+//;
+            
+            #get the partition number
             my $partitionnum = $workingpartition;
             $partitionnum =~ s/\/dev\/[sh]d[a-z]//;
+            
             #Delete, partition number, Write
             open(OFILE, '>/tmp/ofile');
             print OFILE "d\n$partitionnum\nw\n";
             close(OFILE);
             `fdisk -uc $workingdevice 2>&1 < /tmp/ofile`;
+            
+            #run partprobe to update kernel
+            &performPartprobe($workingdevice);
         }#end if confirm
         else{
             print "\n\nWill not delete $workingpartition.\n";
