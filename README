@@ -38,7 +38,7 @@ etc.
 Notes:
 Only currently tested on Debian 6
 
-For filesystem format functionality the mkfs program has to have the associated filesystem utilited installed, (IE, for btfs: btrfs-tools, for xfs: xfsprogs, for jfs: jfsutils, for resier4: reiser4progs).
+For filesystem format functionality the mkfs program has to have the associated filesystem utility installed, (IE, for btfs: btrfs-tools, for xfs: xfsprogs, for jfs: jfsutils, for resier4: reiser4progs).
 
 
 Filesystems tested:
