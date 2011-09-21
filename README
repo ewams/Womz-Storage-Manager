@@ -21,18 +21,33 @@ Summary
 WSM aims to provide a simple utility for managing storage devices on a Linux system.
 
 Details
-WSM is a Perl program that uses common built-in features of an OS to manage storage devices in a Linux system.
+WSM is a Perl program that uses common built-in features of an OS to manage the many aspects of storage devices on a Linux system.
 
 Features
 Scan for new storage devices
 View storage devices and device details
-Automatically install S.M.A.R.T tools (smartmontools) and RAID tools (mdadm) if desired
+View, create, and delete logical partitions
+Format a partition with a filesystem
+Install S.M.A.R.T tools (smartmontools) and RAID tools (mdadm) if desired
 
 TODO
 Manage RAID devices
-Manage partitions
-Manage file systems
+Manage file systems (todo: mounting)
 etc.
 
 Notes:
 Only currently tested on Debian 6
+
+For filesystem format functionality the mkfs program has to have the associated filesystem utilited installed, (IE, for btfs: btrfs-tools, for xfs: xfsprogs, for jfs: jfsutils, for resier4: reiser4progs).
+
+
+Filesystems tested:
+bfs
+btrfs
+ext2
+ext3
+ext4
+jfs
+minix
+reiser4
+xfs
