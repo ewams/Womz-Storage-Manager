@@ -20,7 +20,7 @@
         #Variables#
         ###########
 use strict;        
-my $g_vers = "2011.9.20 Experimental";
+my $g_vers = "2011.9.21 Experimental";
 my $g_app = "Womz Storage Manager";
 my $g_auth = "Eric Wamsley";
 my $g_site = "http://ewams.net";
@@ -1024,11 +1024,9 @@ sub createFilesystem{
                         $counter++;
                     }#end if                    
                 }#end if not extended
-                
-
-
     		}#end foreach partition
         }#end foreach device
+        $counter--;
         
         #check there are partitions available
         if($counter > 1){
