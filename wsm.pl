@@ -183,8 +183,9 @@ sub menuFilesystemsTop {
     print "\n\nFilesystems\nWhat would you like to do?\n";
     print "1 - Create a Filesystem\n";
     print "2 - Mount a Filesystem\n";
-    print "3 - Main Menu\n";
-    print "4 - Exit\n";
+    print "3 - Unmount a Filesystem\n";
+    print "4 - Main Menu\n";
+    print "5 - Exit\n";
     print "Enter a choice (or exit): ";
     chomp(my $option = <>);
     
@@ -194,12 +195,16 @@ sub menuFilesystemsTop {
         &menuFilesystemsTop();
     }#end if
     elsif($option == 2){
+        &mountFileSystem();
         &menuFilesystemsTop();
     }#end elsif
     elsif($option == 3){
         &mainMenu();
     }#end elsif
-    elsif(($option == 4) || ($option eq "exit")){
+    elsif($option == 4){
+        &mainMenu();
+    }#end elsif
+    elsif(($option == 5) || ($option eq "exit")){
     	&quit();
     }#end elsif
     else{
@@ -987,6 +992,10 @@ sub createFilesystem{
         open(DISKSFH, $disksfile);
         my @disks = <DISKSFH>;
         close(DISKSFH);
+
+        #make temp files for blkid and fstab
+        `blkid 2>&1 > /tmp/blkid`;
+        `cat /etc/fstab 2>&1 > /tmp/fstab`;
     
         $counter = 1;
         #run through each device
@@ -1000,22 +1009,18 @@ sub createFilesystem{
     			chomp($part);
                 my @split = split("/",$part);    
                 chomp(my $workingpart = $split[2]);
-               
-                #make temp files for blkid and fstab
-    			`blkid 2>&1 > /tmp/blkid`;
-                `cat /etc/fstab 2>&1 > /tmp/fstab`;
-                
-                #get UUID of partition
-            	chomp(my $uuid = `cat /tmp/blkid | awk '\$0 ~ /$workingpart/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
-            	if(length($uuid) < 12){
-            		$uuid = "None";
-            	}#end if
-                
+
                 #see if partition is extended
             	chomp(my $isextended = `fdisk -luc $devicename 2>&1 | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
                 
                 #if part is not extended continue 
                 if($isextended =~ m/no/){
+                    #get UUID of partition
+                	chomp(my $uuid = `cat /tmp/blkid | awk '\$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+                	if(length($uuid) < 12){
+                		$uuid = "None";
+                	}#end if
+                    
                     #see if the filesystem is mounted
                 	chomp(my $mountloc = `cat /tmp/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
                     if(length($mountloc) < 1){
@@ -1064,10 +1069,16 @@ sub createFilesystem{
     else{
         print "\nInvalid filesystem.\n";
     }#end else
-
-
 }#end function createFilesystem
 
+
+#Function mountFileSystem
+#Mount unmounted filesystems. Also add them to fstab if desired.
+#Params: n/a
+#Returns: n/a
+sub mountFileSystem {
+    
+}#end function mountFileSystem
 
 #####
 #EOF#
