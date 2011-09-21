@@ -597,6 +597,12 @@ sub viewStorageDeviceDetails {
 		print "\n\n";
 		print "Partition information:\n";
 		
+        #create blkid temp file
+	    `blkid 2>&1 > /tmp/blkid`;
+        
+        #create fdisk temp file
+        `fdisk -luc $device 2>&1 > /tmp/fdisk`;
+        
 		my $totalparts = 0;
         #print partition information
 		foreach my $part (@partitions){
@@ -619,6 +625,7 @@ sub viewStorageDeviceDetails {
 
 #Function viewPartitionInfo
 #Prints a table of various information regarding a partition.
+#Before calling this function, these two temp files must be created: `blkid 2>&1 > /tmp/blkid`; and `fdisk -luc $device 2>&1 > /tmp/fdisk`;
 #Params:
 #0 - String - Device name that partition is on
 #1 - String - Partition name to get info about
@@ -629,16 +636,15 @@ sub viewPartitionInfo {
     #get just partition name without /dev/ on it
 	my @split = split("/",$partition);    
 	chomp(my $workingpart = $split[2]);
-    `fdisk -luc $device 2>&1 | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' > /tmp/fdisk`;
-	`blkid 2>&1 > /tmp/blkid`;
+    
     #see if partition is bootable
-	chomp(my $isbootable = `cat /tmp/fdisk | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
+	chomp(my $isbootable = `cat /tmp/fdisk | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
     #see if device is a swap partition
-	chomp(my $isswap = `cat /tmp/fdisk | awk '/$workingpart/ && /swap/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
+	chomp(my $isswap = `cat /tmp/fdisk | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' | awk '/$workingpart/ && /swap/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
     #see if it is an extended partition
-	chomp(my $isextended = `cat /tmp/fdisk | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
+	chomp(my $isextended = `cat /tmp/fdisk | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' | awk '/$workingpart/ && /Extended/ { ++x } END {if (x ==1) print "yes"; else print "no"}'`);
     #get size of sectors from the device the partition is on
-	chomp(my $sectorsize = `fdisk -luc $device 2>&1 | awk '\$0 ~ /Sector size/ { print \$4 }'`);
+	chomp(my $sectorsize = `cat /tmp/fdisk | awk '\$0 ~ /Sector size/ { print \$4 }'`);
 	my $sectorsend;
 	my $sectorstart;
 	if($isbootable =~ m/yes/){
@@ -722,11 +728,17 @@ sub viewAllPartitions {
     open(DISKSFH, $disksfile);
     my @disks = <DISKSFH>;
     close(DISKSFH);
+    
+    #create blkid temp file
+	`blkid 2>&1 > /tmp/blkid`;
 
     #run through each device
     foreach my $line (@disks){ 
         chomp(my $devicename = $line);
-
+        
+        #create fdisk temp file
+        `fdisk -luc $devicename 2>&1 > /tmp/fdisk`;
+        
         #get all partitions for device
         my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
         foreach my $part (@partitions){
