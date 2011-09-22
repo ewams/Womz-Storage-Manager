@@ -199,7 +199,8 @@ sub menuFilesystemsTop {
         &menuFilesystemsTop();
     }#end elsif
     elsif($option == 3){
-        &mainMenu();
+        &unmountFileSystem();
+        &menuFilesystemsTop();
     }#end elsif
     elsif($option == 4){
         &mainMenu();
@@ -263,7 +264,7 @@ sub getDisks {
 #0 - String - Reason for exit
 #Returns: n/a
 sub quit {
-    `rm -rf /tmp/blkid /tmp/disks /tmp/fdisk /tmp/hostscan /tmp/smart /tmp/ofile`;
+    `rm -rf /tmp/blkid /tmp/disks /tmp/fdisk /tmp/hostscan /tmp/smart /tmp/ofile /tmp/mount`;
 	chomp(my($reason) = @_);
 	die $reason."\nHave a nice day.\n";
 }#end quit function
@@ -1182,10 +1183,7 @@ sub mountFileSystem {
     print "\n\n";
     print "Mount filesystem\n";
     print "Which filesystem would you like to mount?\n";
-    
-    #make temp files for blkid
-    `blkid 2>&1 > /tmp/blkid`;
-    
+      
     #create list of disks in tmp file
 	&getDisks();
     my $disksfile = "/tmp/disks";
@@ -1257,22 +1255,28 @@ sub mountFileSystem {
                     `mkdir -p $locselect 2>&1 > /dev/null`;
                     
                     #mount filesystem
-                    `mount $partselect $locselect`;
+                    chomp(my $mountresults = `mount $partselect $locselect 2>&1`);
                     
-                    #see if user wanted to write to fstab
-                    if($writefstab eq "yes"){
-                        my @split = split("/",$partselect);
-                        chomp(my $workingpart = $split[2]);
-                        #get info about partition and filesystem
-                        chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
-                        chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS=" TYPE=\\""} \$0 ~ /$workingpart:/ {sub(/\\"/, "", \$2); print \$2}'`);
-                        
-                        #write info to fstab
-                        open(OFILE, '>/tmp/ofile');
-                        print OFILE "\n#$uuid was added by Womz Storage Manager (WSM)\nUUID=$uuid\t$locselect\t$fstype\tdefaults\t0\t2\n";
-                        close(OFILE);
-                        `cat /tmp/ofile >> /etc/fstab`;
+                    #check for error
+                    if($mountresults =~ m/unknown/){
+                        print "\nUnable to mount filesystem, error message:\n$mountresults\n";
                     }#end if
+                    else{
+                        #see if user wanted to write to fstab
+                        if($writefstab eq "yes"){
+                            my @split = split("/",$partselect);
+                            chomp(my $workingpart = $split[2]);
+                            #get info about partition and filesystem
+                            chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+                            chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS=" TYPE=\\""} \$0 ~ /$workingpart:/ {sub(/\\"/, "", \$2); print \$2}'`);
+                            
+                            #write info to fstab
+                            open(OFILE, '>/tmp/ofile');
+                            print OFILE "#$uuid was added by Womz Storage Manager (WSM)\nUUID=$uuid\t$locselect\t$fstype\tdefaults\t0\t2\n";
+                            close(OFILE);
+                            `cat /tmp/ofile >> /etc/fstab`;
+                        }#end if
+                    }#end else
                 }#end if confirmed
                 else{
                     print "\nNo filesystem will be mounted.\n";
@@ -1291,6 +1295,111 @@ sub mountFileSystem {
     }#end else no partitions
 }#end function mountFileSystem
 
+
+#Function unmountFileSystem
+#Unmounted a filesystem and delete it from /etc/fstab.
+#Params: n/a
+#Returns: n/a
+sub unmountFileSystem {
+    print "\n\n";
+    print "Un-mount filesystem\n";
+    print "Which filesystem would you like to un-mount?\n";
+    
+    #create list of disks in tmp file
+	&getDisks();
+    my $disksfile = "/tmp/disks";
+    open(DISKSFH, $disksfile);
+    my @disks = <DISKSFH>;
+    close(DISKSFH);
+
+    #make temp files for blkid and fstab
+    `blkid 2>&1 > /tmp/blkid`;
+    `cat /etc/fstab 2>&1 > /tmp/fstab`;
+    `mount -l > /tmp/mount`;
+
+    my $counter = 0;
+    #run through each device
+    my @availableparts;
+    foreach my $devicename (@disks){ 
+        chomp($devicename);
+
+        #get all partitions for device
+        my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
+        foreach my $part (@partitions){
+			chomp($part);
+            my @split = split("/",$part);    
+            chomp(my $workingpart = $split[2]);
+            #get UUID of partition
+        	chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+        	if(length($uuid) > 12){
+        		#get filesystem type
+                chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS=" TYPE=\\""} \$0 ~ /$workingpart:/ {sub(/\\"/, "", \$2); print \$2}'`);
+                if((length($fstype) > 1) && !($fstype =~ m/swap/)){
+                    #get mount location
+                	chomp(my $mountloc = `cat /tmp/mount | awk '\$1 ~ /$workingpart\$/ { print \$3 }'`);
+                    if(length($mountloc) > 1){
+                        $counter++;
+                        print "$counter - $part\t$fstype\t$mountloc\n";
+                        $availableparts[$counter] = $part;
+                    }#end if
+                }#end if has fs
+        	}#end if has uuid
+        }#end foreach partition
+   }#end foreach device
+   
+   #see if there were partitions available
+    if($counter > 0){
+        print "Enter partition number: ";
+        chomp(my $partselect = <>);
+        
+        #check valid partition selected
+        if(($partselect > 0) && ($partselect <= $counter)){
+            $partselect = $availableparts[$partselect];
+            
+            print "\n\nAre you sure you want to un-mount $partselect?\n";
+            print "Choice (yes or no): ";
+            chomp(my $confirm = <>);
+                
+            #confirm from user
+            if($confirm eq "yes"){
+                my @split = split("/",$partselect);
+                chomp(my $workingpart = $split[2]);
+                
+                #get uuid of partition
+                chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+    
+                #clear options file
+                `rm -rf /tmp/ofile`;
+                
+                #create temp file with new fstab
+                `cat /etc/fstab |  awk '\$0 !~ /$uuid/ { print \$0 }' > /tmp/ofile`;
+                
+                #backup current /etc/fstab
+                chomp(my $fsbackup = `date +%s`);
+                $fsbackup = "/tmp/fstab".$fsbackup.".bak";
+                `cat /etc/fstab > $fsbackup`;
+                
+                #unmount filesystem
+                `umount $partselect`;
+                
+                #rewrite /etc/fstab
+                `cat /tmp/ofile > /etc/fstab`;
+                
+                print "\n\nA backup of /etc/fstab was created in $fsbackup.\n";
+            }#end if confirmed
+            else{
+                print "\nFilesystem will not be un-mounted.\n";
+            }#end else
+        }#end if valid partition
+        else{
+            print "\nInvalid partition.\n";
+        }#end else                
+    }#end if mounted partitions existed
+    else{
+        print "\nNo un-mountable filesystems exist.\n";
+    }#end else
+
+}#end function unmountFileSystem
 #####
 #EOF#
 #####
