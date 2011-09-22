@@ -20,6 +20,12 @@ Site: http://ewams.net
 Summary
 WSM aims to provide a simple utility for managing storage devices on a Linux system.
 
+How to run
+1) Download wsm.pl to the target system
+2) chmod +x wsm.pl
+3) ./wsm.pl
+4) Follow instructions and provide input with keyboard
+
 Details
 WSM is a Perl program that uses common built-in features of an OS to manage the many aspects of storage devices on a Linux system to simplify administration overhead.
 
@@ -37,6 +43,8 @@ RAID devices
 Help / videos
 
 Notes:
+Application must be ran as root.
+
 Only currently tested on Debian 6.
 
 For filesystem format functionality the mkfs program has to have the associated filesystem utility installed, (IE, for btfs: btrfs-tools, for xfs: xfsprogs, for jfs: jfsutils, for resier4: reiser4progs).
