@@ -617,7 +617,6 @@ sub viewStorageDeviceDetails {
 		else{
 			print "Total partitions: $totalparts\n";
 		}#end else
-
 	}#end else
 
 }#end function viewStorageDeviceDetails
@@ -674,7 +673,7 @@ sub viewPartitionInfo {
         $fstype = " has a filesystem type of $fstype";
     }#end else
     #get mount location
-	chomp(my $mountloc = `cat /etc/fstab | awk '\$0 ~ /$uuid/ { print \$2 }'`);
+	chomp(my $mountloc = `cat /tmp/mount | awk '\$1 ~ /$workingpart\$/ { print \$3 }'`);
     #print "\n\nrunning on $workingpart: cat /etc/fstab | awk '0 ~ /$uuid/ { print 2 }'\n\n";
     if(length($mountloc) < 1){
         $mountloc = "and no mount location";
@@ -729,8 +728,9 @@ sub viewAllPartitions {
     my @disks = <DISKSFH>;
     close(DISKSFH);
     
-    #create blkid temp file
+    #create blkid and mount temp file
 	`blkid 2>&1 > /tmp/blkid`;
+    `mount -l > /tmp/mount`;
 
     #run through each device
     foreach my $line (@disks){ 
@@ -1179,7 +1179,116 @@ sub createFilesystem{
 #Params: n/a
 #Returns: n/a
 sub mountFileSystem {
+    print "\n\n";
+    print "Mount filesystem\n";
+    print "Which filesystem would you like to mount?\n";
     
+    #make temp files for blkid
+    `blkid 2>&1 > /tmp/blkid`;
+    
+    #create list of disks in tmp file
+	&getDisks();
+    my $disksfile = "/tmp/disks";
+    open(DISKSFH, $disksfile);
+    my @disks = <DISKSFH>;
+    close(DISKSFH);
+
+    #make temp files for blkid and fstab
+    `blkid 2>&1 > /tmp/blkid`;
+    `cat /etc/fstab 2>&1 > /tmp/fstab`;
+    `mount -l > /tmp/mount`;
+
+    my $counter = 0;
+    #run through each device
+    my @availableparts;
+    foreach my $devicename (@disks){ 
+        chomp($devicename);
+
+        #get all partitions for device
+        my @partitions = `fdisk -luc $devicename 2>&1 | awk '\$0 ~ /sd/ && \$0 !~ /Disk/ { print \$1 }'`;
+        foreach my $part (@partitions){
+			chomp($part);
+            my @split = split("/",$part);    
+            chomp(my $workingpart = $split[2]);
+            #get UUID of partition
+        	chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+        	if(length($uuid) > 12){
+        		#get filesystem type
+                chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS=" TYPE=\\""} \$0 ~ /$workingpart:/ {sub(/\\"/, "", \$2); print \$2}'`);
+                if((length($fstype) > 1) && !($fstype =~ m/swap/)){
+                    #get mount location
+                	chomp(my $mountloc = `cat /tmp/mount | awk '\$1 ~ /$workingpart\$/ { print \$3 }'`);
+                    if(length($mountloc) < 1){
+                        $counter++;
+                        print "$counter - $part\t$fstype\n";
+                        $availableparts[$counter] = $part;
+                    }#end if
+                }#end if has fs
+        	}#end if has uuid
+        }#end foreach partition
+   }#end foreach device
+   
+   #see if there were partitions available
+    if($counter > 0){
+        print "Enter partition number: ";
+        chomp(my $partselect = <>);
+        
+        #check user selected a good number
+        if(($partselect > 0 ) && ($partselect <= $counter)){
+            $partselect = $availableparts[$partselect];
+            print "\n\nWhere do you want to mount $partselect?\n";
+            print "You can enter a new or existing directory.\n";
+            print "Mount location: ";
+            chomp(my $locselect = <>);
+            
+            if(($locselect =~ m/^\//) && ($locselect ne "/")){
+                print "\n\nDo you want changes to be persistent on reboots?\n";
+                print "Choice (yes or no): ";
+                chomp(my $writefstab = <>);
+                
+                
+                print "\n\nAre you sure you want to mount $partselect on $locselect?\n";
+                print "Choice (yes or no): ";
+                chomp(my $confirm = <>);
+                
+                #confirm from user
+                if($confirm eq "yes"){
+                    #make directory if doesnt exit
+                    `mkdir -p $locselect 2>&1 > /dev/null`;
+                    
+                    #mount filesystem
+                    `mount $partselect $locselect`;
+                    
+                    #see if user wanted to write to fstab
+                    if($writefstab eq "yes"){
+                        my @split = split("/",$partselect);
+                        chomp(my $workingpart = $split[2]);
+                        #get info about partition and filesystem
+                        chomp(my $uuid = `cat /tmp/blkid | awk 'BEGIN { FS = " " } \$0 ~ /$workingpart:/ { print \$2 }' | awk 'BEGIN { FS = "\\\"" }; { print \$2 }'`);
+                        chomp(my $fstype = `cat /tmp/blkid |  awk 'BEGIN { FS=" TYPE=\\""} \$0 ~ /$workingpart:/ {sub(/\\"/, "", \$2); print \$2}'`);
+                        
+                        #write info to fstab
+                        open(OFILE, '>/tmp/ofile');
+                        print OFILE "\n#$uuid was added by Womz Storage Manager (WSM)\nUUID=$uuid\t$locselect\t$fstype\tdefaults\t0\t2\n";
+                        close(OFILE);
+                        `cat /tmp/ofile >> /etc/fstab`;
+                    }#end if
+                }#end if confirmed
+                else{
+                    print "\nNo filesystem will be mounted.\n";
+                }#end else
+            }#end if good location
+            else{
+                print "\nInvalid mount location selected.\n";
+            }#end else bad location
+        }#end if valid part
+        else{
+            print "\nInvalid partition.\n";
+        }#end else
+    }#end if partitions found
+    else{
+        print "\nThere were no mountable partitions found.\n";
+    }#end else no partitions
 }#end function mountFileSystem
 
 #####
