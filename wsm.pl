@@ -20,7 +20,7 @@
         #Variables#
         ###########
 use strict;        
-my $g_vers = "2011.9.21 Experimental";
+my $g_vers = "2011.9.22 Experimental";
 my $g_app = "Womz Storage Manager";
 my $g_auth = "Eric Wamsley";
 my $g_site = "http://ewams.net";
@@ -636,6 +636,7 @@ sub viewPartitionInfo {
     #get just partition name without /dev/ on it
 	my @split = split("/",$partition);    
 	chomp(my $workingpart = $split[2]);
+    `mount -l > /tmp/mount`;
     
     #see if partition is bootable
 	chomp(my $isbootable = `cat /tmp/fdisk | awk '(\$0 ~ /sd/ || \$0 ~ /md/) && \$0 !~ /Disk/ { print \$0 }' | awk '/$workingpart/ && /\\*/ { ++x } END {if (x == 1) print "yes"; else print "no"}'`);
