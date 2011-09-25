@@ -20,7 +20,7 @@
         #Variables#
         ###########
 use strict;        
-my $g_vers = "2011.9.22 Experimental";
+my $g_vers = "2011.9.25 Experimental";
 my $g_app = "Womz Storage Manager";
 my $g_auth = "Eric Wamsley";
 my $g_site = "http://ewams.net";
